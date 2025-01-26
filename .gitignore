@@ -1,0 +1,16 @@
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Fichiers temporaires bash
+*~
+*.swp
+*.swo
+
+# Logs
+*.log
+debug.log
+
+# Répertoires de travail
+tmp/
+temp/
