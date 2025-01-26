@@ -16,5 +16,5 @@ Script de désinstallation complet et sécurisé de LibreOffice pour les systèm
 
 ## Utilisation
 ```bash
-chmod +x desinstall_libreoffice.sh
-sudo ./desinstall_libreoffice.sh
+chmod +x remove_libreoffice.sh
+sudo ./remove_libreoffice.sh
