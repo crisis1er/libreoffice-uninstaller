@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# remove_libreoffice.sh — Complete LibreOffice uninstaller for openSUSE
+# Tested on: openSUSE Tumbleweed
 set -euo pipefail
 
 GREEN="\e[32m"
@@ -6,80 +8,95 @@ RED="\e[31m"
 BOLD="\e[1m"
 RESET="\e[0m"
 
-echo -e "${BOLD}${GREEN}==========================================="
-echo "Désinstallation complète de LibreOffice..."
-echo -e "===========================================${RESET}"
+# ==================== ROOT CHECK ====================
+check_root() {
+    if [[ $EUID -ne 0 ]]; then
+        echo -e "${RED}This script requires root privileges.${RESET}"
+        echo ""
+        read -r -p "Run with sudo? [Y/n] " response
+        if [[ "$response" =~ ^([yY]|[yY][eE][sS]|)$ ]]; then
+            exec sudo "$0" "$@"
+        else
+            echo "Cancelled."
+            exit 1
+        fi
+    fi
+}
 
-# Demande de confirmation avant la désinstallation
-read -r -p "Êtes-vous sûr de vouloir désinstaller LibreOffice ? (O/n) " response
-if [[ ! "$response" =~ ^([oO]|[oO][uU][iI])$ ]]; then
-  echo -e "${RED}Opération annulée.${RESET}"
-  exit 0
+check_root "$@"
+
+echo -e "${BOLD}${GREEN}==========================================="
+echo " LibreOffice Complete Uninstaller"
+echo -e "===========================================${RESET}"
+echo ""
+
+# ==================== CONFIRMATION ====================
+read -r -p "Are you sure you want to uninstall LibreOffice? [y/N] " response
+if [[ ! "$response" =~ ^([yY]|[yY][eE][sS])$ ]]; then
+    echo -e "${RED}Operation cancelled.${RESET}"
+    exit 0
 fi
 
-# 1. Suppression des paquets
-echo -e "${BOLD}Suppression des paquets 'libreoffice*'...${RESET}"
-sudo zypper rm libreoffice*
+# ==================== 1. REMOVE LIBREOFFICE PACKAGES ====================
+echo -e "\n${BOLD}Removing LibreOffice packages...${RESET}"
+LO_PACKAGES=$(rpm -qa --queryformat '%{NAME}\n' | grep -E '^libreoffice|^libobasis' || true)
 
-# 2. Suppression des paquets libobasis* (si installation via archives officielles)
-echo -e "${BOLD}Suppression des paquets 'libobasis*'...${RESET}"
-sudo zypper rm libobasis* || echo -e "${RED}Aucun paquet libobasis* trouvé.${RESET}"
+if [[ -n "$LO_PACKAGES" ]]; then
+    echo "$LO_PACKAGES" | xargs zypper --non-interactive rm --clean-deps 2>/dev/null || true
+    echo -e "${GREEN}Done.${RESET}"
+else
+    echo -e "${RED}No LibreOffice packages found via RPM.${RESET}"
+fi
 
-# 3. Suppression du dossier de configuration personnel
-echo -e "${BOLD}Suppression du dossier ~/.config/libreoffice...${RESET}"
-rm -rf ~/.config/libreoffice
+# ==================== 2. REMOVE ORPHANED LIBRARIES ====================
+echo -e "\n${BOLD}Removing orphaned LibreOffice libraries...${RESET}"
+LIB_PACKAGES=$(rpm -qa --queryformat '%{NAME}\n' | grep -E \
+    '^libabw|^libcdr|^libclucene|^libcmis|^libe-book|^libeot|^libepubgen|\
+^libetonyek|^libexttextcat|^libfreehand|^libixion|^liblangtag|\
+^libmspub|^libmwaw|^libmythes|^libnumbertext|^libodfgen|^liborcus|\
+^libpagemaker|^libqxp|^librepository|^librevenge|^libserializer|\
+^libstaroffice|^libvisio|^libwpd|^libwpg|^libwps|^libzmf' || true)
 
-# 4. Suppression des bibliothèques liées à LibreOffice
-echo -e "${BOLD}Suppression des bibliothèques associées à LibreOffice...${RESET}"
-sudo zypper rm \
-  libabw \
-  libcdr \
-  libclucene-contribs-lib1 \
-  libclucene-core1 \
-  libclucene-shared1 \
-  libcmis \
-  libe-book \
-  libeot0 \
-  libepubgen \
-  libetonyek \
-  libexttextcat \
-  libfreehand \
-  libixion-0_18-0 \
-  liblangtag1 \
-  libmspub \
-  libmwaw \
-  libmythes \
-  libnumbertext \
-  libnumbertext-data \
-  libodfgen \
-  liborcus \
-  libpagemaker \
-  libqxp \
-  librepository \
-  librevenge \
-  libserializer \
-  libstaroffice \
-  libvisio \
-  libwpd \
-  libwpg \
-  libwps \
-  libzmf \
-  libreoffice-icon-themes \
-  libreoffice-share-linker \
-  libreoffice-branding-openSUSE || echo -e "${RED}Certains paquets ci-dessus peuvent être introuvables, ce n'est pas grave.${RESET}"
+if [[ -n "$LIB_PACKAGES" ]]; then
+    echo "$LIB_PACKAGES" | xargs zypper --non-interactive rm 2>/dev/null || \
+        echo -e "${RED}Some libraries could not be removed (may be used by other packages).${RESET}"
+    echo -e "${GREEN}Done.${RESET}"
+else
+    echo "No orphaned libraries found."
+fi
 
-# 5. Ajout d'un verrou pour empêcher la réinstallation automatique
-echo -e "${BOLD}Ajout d'un verrou sur 'libreoffice*'...${RESET}"
-sudo zypper addlock libreoffice*
+# ==================== 3. REMOVE USER CONFIGURATION ====================
+echo -e "\n${BOLD}Removing user configuration directory...${RESET}"
+ORIGINAL_USER="${SUDO_USER:-$USER}"
+USER_CONFIG="/home/$ORIGINAL_USER/.config/libreoffice"
 
-# 6. Vérification des paquets restants
-echo -e "${BOLD}Vérification des paquets restants contenant 'libreoffice'...${RESET}"
-rpm -qa | grep libreoffice && echo -e "${RED}Certains paquets LibreOffice persistent encore.${RESET}" || echo -e "${GREEN}Aucun paquet LibreOffice trouvé.${RESET}"
+if [[ -d "$USER_CONFIG" ]]; then
+    rm -rf "$USER_CONFIG"
+    echo -e "${GREEN}Removed: $USER_CONFIG${RESET}"
+else
+    echo "No user configuration found at $USER_CONFIG."
+fi
 
-# 7. Affiche la liste des verrous en place
-echo -e "${GREEN}Liste des verrous en place :${RESET}"
+# ==================== 4. ADD ZYPPER LOCK ====================
+echo -e "\n${BOLD}Adding zypper lock to prevent automatic reinstall...${RESET}"
+zypper addlock 'libreoffice*' 2>/dev/null || true
+zypper addlock 'libobasis*' 2>/dev/null || true
+echo -e "${GREEN}Locks added.${RESET}"
+
+# ==================== 5. VERIFY ====================
+echo -e "\n${BOLD}Verifying removal...${RESET}"
+REMAINING=$(rpm -qa | grep -E 'libreoffice|libobasis' || true)
+
+if [[ -n "$REMAINING" ]]; then
+    echo -e "${RED}Some packages still present:${RESET}"
+    echo "$REMAINING"
+else
+    echo -e "${GREEN}No LibreOffice packages remaining.${RESET}"
+fi
+
+echo -e "\n${BOLD}Active zypper locks:${RESET}"
 zypper locks
 
-echo -e "${BOLD}${GREEN}==========================================="
-echo "Désinstallation terminée."
+echo -e "\n${BOLD}${GREEN}==========================================="
+echo " Uninstallation complete."
 echo -e "===========================================${RESET}"
