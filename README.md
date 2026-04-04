@@ -33,8 +33,7 @@ Complete LibreOffice uninstaller script for **openSUSE Tumbleweed** — removes 
 ## Usage
 
 ```bash
-chmod +x remove-libreoffice
-./remove-libreoffice
+remove-libreoffice
 ```
 
 The script will prompt for sudo if not already running as root.
