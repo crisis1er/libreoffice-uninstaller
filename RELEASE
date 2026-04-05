@@ -1,6 +1,29 @@
-# RELEASE
+# RELEASE — libreoffice-uninstaller
 
-Version: v1.0
-Date:    2026-04-05
+Version:  v1.0
+Date:     2026-04-04
+Platform: openSUSE Tumbleweed (RPM-based)
+Script:   /usr/local/bin/remove-libreoffice
 
-See CHANGELOG.md for details.
+---
+
+## What's in this release
+
+### Complete rewrite of the removal script
+- Dynamic package detection via `rpm -qa` — no hardcoded package list
+- Detects and removes all LibreOffice packages matching `libreoffice*` and `liblibreoffice*`
+- Orphaned library cleanup — removes residual dependencies left after main package removal
+- Root check with clear error message if run without privileges
+- Dry-run output before removal — shows what will be removed
+
+### Installation
+- Script installed as `/usr/local/bin/remove-libreoffice` — no `./` prefix, no extension
+- Executable directly from any terminal: `sudo remove-libreoffice`
+
+### Compatibility
+- Tested on openSUSE Tumbleweed with Squid/zypper package management
+- Works with any LibreOffice version installed via zypper or RPM
+
+### Documentation
+- README rewritten — problem statement, installation, usage examples
+- `CONTRIBUTING.md` — contribution guidelines
